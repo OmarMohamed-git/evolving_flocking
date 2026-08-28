@@ -4,130 +4,280 @@
 <meta charset="utf-8">
 <title>Evolving Flocking</title>
 <style>
-  /* margin: 0 removes the browser's default gap around the page.
-     overflow: hidden stops scrollbars appearing - a scrollbar would take
-     up ~15px of width, the canvas would no longer fit, and that alone can
-     make a second scrollbar appear on the other axis. */
+  /* --- page layout ---------------------------------------------------
+     The page is a horizontal flexbox: a fixed-width sidebar on the left,
+     and the canvas taking whatever is left over. 100vh means "100% of the
+     viewport height", so the whole thing is exactly one screen tall. */
   html, body {
     margin: 0;
+    height: 100vh;
     overflow: hidden;
     background: #0b0f14;
+    color: #d7e3ef;
+    font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
 
-  /* A <canvas> is inline by default, so the browser reserves a few pixels
-     under it for a text baseline. block removes that gap. */
+  body {
+    display: flex;
+  }
+
+  /* flex: none stops the sidebar from being squashed or stretched -
+     it keeps its 260px whatever else happens. */
+  #sidebar {
+    flex: none;
+    width: 260px;
+    height: 100%;
+    padding: 18px 16px;
+    box-sizing: border-box;      /* padding counts inside the 260px */
+    overflow-y: auto;
+    background: #10161e;
+    border-right: 1px solid rgba(120, 160, 200, 0.18);
+  }
+
+  /* flex: 1 means "take all the remaining width". */
   canvas {
+    flex: 1;
     display: block;
+  }
+
+  /* --- sidebar text -------------------------------------------------- */
+  h1 {
+    margin: 0 0 2px;
+    font-size: 14px;
+  }
+
+  .subtitle {
+    margin: 0 0 18px;
+    font-size: 11px;
+    color: #8ba0b5;
+  }
+
+  h2 {
+    margin: 18px 0 10px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(120, 160, 200, 0.18);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8ba0b5;
+  }
+
+  h2:first-of-type {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
+
+  /* --- one slider row ------------------------------------------------ */
+  .control {
+    margin-bottom: 14px;
+  }
+
+  /* The label is a flexbox too: name pushed left, number pushed right. */
+  .control label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+
+  .control .value {
+    color: #7fd4ff;
+    font-size: 11px;
+    /* tabular-nums stops the number jittering as digits change width */
+    font-variant-numeric: tabular-nums;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    margin: 0;
+    accent-color: #7fd4ff;
+  }
+
+  /* Small colour square next to the prey / predator labels. */
+  .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    margin-right: 6px;
+  }
+
+  .dot.prey { background: #7fd4ff; }
+  .dot.predator { background: #ff5c5c; }
+
+  .note {
+    margin-top: 20px;
+    font-size: 11px;
+    color: #5f7285;
+    line-height: 1.5;
   }
 </style>
 </head>
 <body>
 
-<!-- No width/height attributes now. They get set from JavaScript instead,
-     because the window size is not known until the page runs. -->
+<!-- ===================== SIDEBAR ===================== -->
+<div id="sidebar">
+  <h1>Evolving Flocking</h1>
+  <p class="subtitle">Stage 1 — controls only, nothing wired up yet.</p>
+
+  <h2>Population</h2>
+
+  <!-- Each control is: a label holding a name and a live value readout,
+       then the slider itself.
+
+       The id on the <input> is how JavaScript finds the slider.
+       The id on the <span> is how it finds the number to update.
+       min / max / step / value are plain HTML - no code needed for the
+       slider to work as a slider. -->
+  <div class="control">
+    <label>
+      <span><i class="dot prey"></i>Prey</span>
+      <span class="value" id="preyCount-value">200</span>
+    </label>
+    <input type="range" id="preyCount" min="0" max="1000" step="10" value="200">
+  </div>
+
+  <div class="control">
+    <label>
+      <span><i class="dot predator"></i>Predators</span>
+      <span class="value" id="predatorCount-value">3</span>
+    </label>
+    <input type="range" id="predatorCount" min="0" max="20" step="1" value="3">
+  </div>
+
+  <h2>Movement</h2>
+
+  <div class="control">
+    <label>
+      <span>Speed</span>
+      <span class="value" id="speed-value">100 px/s</span>
+    </label>
+    <input type="range" id="speed" min="0" max="300" step="5" value="100">
+  </div>
+
+  <p class="note">
+    Sliders move and report their value, but nothing reads them yet.
+    They write into a <code>params</code> object the simulation will use later.
+  </p>
+</div>
+
+<!-- ===================== CANVAS ===================== -->
 <canvas id="canvas"></canvas>
 
 <script>
-// ---------------------------------------------------------------------
-// 1. Find the canvas, and get something that can draw on it
-// ---------------------------------------------------------------------
+// =====================================================================
+// 1. Canvas setup
+// =====================================================================
 
-// `document` is the page. getElementById searches it for the tag whose
-// id attribute is "canvas" - the one written above - and returns it.
 const canvas = document.getElementById('canvas');
-
-// The tag itself has no drawing methods. Asking it for a "2d context"
-// returns a separate object that does: fillStyle, fillRect, beginPath,
-// moveTo, lineTo, fill, translate, rotate. `ctx` is the paintbrush.
 const ctx = canvas.getContext('2d');
 
-
-// ---------------------------------------------------------------------
-// 2. Match the canvas to the window
-// ---------------------------------------------------------------------
-
-// window.innerWidth / innerHeight are the size of the area the page can
-// actually use, in pixels - the window minus its toolbars and tabs.
+// The canvas no longer fills the window - the sidebar takes 260px of it.
+// clientWidth / clientHeight are the size the browser has actually laid
+// this element out at, after flexbox has done its work. That is what to
+// measure, not window.innerWidth.
 //
-// Assigning to canvas.width sets how many real pixels the canvas has to
-// draw on. It also WIPES the canvas completely - even setting it to the
-// value it already has. That is why all the drawing lives in a function
-// below and gets called again after every resize.
+// Assigning to canvas.width sets the real pixel grid AND wipes the canvas
+// blank, even when set to the value it already had. So every resize has
+// to be followed by a redraw.
 function fitToWindow() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
 }
 
 
-// ---------------------------------------------------------------------
-// 3. Draw everything
-// ---------------------------------------------------------------------
+// =====================================================================
+// 2. Parameters
+// =====================================================================
+
+// Every tunable number lives in one object. Right now nothing reads it -
+// the sliders write here and the drawing ignores it. That is deliberate:
+// this is the seam the simulation plugs into next, and having one place
+// for all of it is what keeps a later change small.
+const params = {
+  preyCount: 200,
+  predatorCount: 3,
+  speed: 100,      // pixels per second
+};
+
+
+// =====================================================================
+// 3. Wire the sliders to it
+// =====================================================================
+
+// One function handles every slider, so adding a fourth is one line
+// rather than another copy-pasted block.
+//
+//   id      - matches both the <input id="..."> and the <span id="...-value">
+//   key     - which field of params to write into
+//   format  - turns the number into the text shown beside the label
+function bindSlider(id, key, format) {
+  const input = document.getElementById(id);
+  const output = document.getElementById(id + '-value');
+
+  // Named so it can be used twice: once now, once on every change.
+  function apply() {
+    // Slider values arrive as STRINGS - "200", not 200. Without Number()
+    // here, params.preyCount + 1 would give "2001" instead of 201.
+    const value = Number(input.value);
+    params[key] = value;
+    output.textContent = format(value);
+  }
+
+  // 'input' fires continuously while dragging.
+  // ('change' would only fire once, on release - less responsive.)
+  input.addEventListener('input', apply);
+
+  // Run once at startup so params and the readout match the slider's
+  // starting position, rather than trusting the numbers typed into the HTML.
+  apply();
+}
+
+bindSlider('preyCount', 'preyCount', v => String(v));
+bindSlider('predatorCount', 'predatorCount', v => String(v));
+bindSlider('speed', 'speed', v => v + ' px/s');
+
+
+// =====================================================================
+// 4. Draw
+// =====================================================================
 
 const SIZE = 20; // how big the triangle is, in pixels
 
 function draw() {
   // --- the field ---
-
-  // fillStyle is a setting, not an argument. It stays set until changed,
-  // and everything filled after this line uses it.
   ctx.fillStyle = '#0b0f14';
-
-  // Filled rectangle: x, y, width, height. Starting at (0,0) with the
-  // full canvas size covers the lot. Canvas coordinates start at the
-  // TOP-LEFT, and y increases DOWNWARDS.
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // --- the triangle ---
-
-  // save() snapshots the drawing state - where the origin is, rotation,
-  // colours. restore() puts it back. Everything between is temporary.
+  // save() snapshots the drawing state, restore() puts it back, so the
+  // translate below only applies to what is drawn between them.
   ctx.save();
 
-  // translate() moves the origin (0,0). After this line, drawing at (0,0)
-  // draws at the middle of the canvas - which is now the middle of the
-  // window, because the canvas fills it.
-  //
-  // This is why the triangle below is described around (0,0) rather than
-  // at real screen coordinates: the shape stays fixed and simple, and
-  // WHERE it appears is decided separately. Later, a rotate() added here
-  // will turn it to face its direction of travel, shape untouched.
+  // Move the origin to the middle of the canvas.
   ctx.translate(canvas.width / 2, canvas.height / 2);
 
   ctx.fillStyle = '#7fd4ff';
 
-  // beginPath() discards any previous path and starts fresh. Without it
-  // this triangle would be joined onto the rectangle above.
   ctx.beginPath();
-
-  // moveTo lifts the pen and puts it down. lineTo draws from where the
-  // pen is to a new point.
-  //
-  // The nose is out along +x with the back corners behind it, so the
-  // triangle points RIGHT. Deliberate: an angle of 0 in canvas maths also
-  // points right, so later "rotate to my heading" will just work.
-  ctx.moveTo(SIZE, 0);                   // nose, out in front
-  ctx.lineTo(-SIZE * 0.6, SIZE * 0.6);   // back corner, below
-  ctx.lineTo(-SIZE * 0.6, -SIZE * 0.6);  // back corner, above
-
-  // closePath() draws the last edge, from the final corner back to the first.
+  // Nose along +x, back corners behind it, so the triangle points RIGHT.
+  // An angle of 0 also points right, so adding a rotate() above this later
+  // will aim it along its velocity without touching these numbers.
+  ctx.moveTo(SIZE, 0);
+  ctx.lineTo(-SIZE * 0.6, SIZE * 0.6);
+  ctx.lineTo(-SIZE * 0.6, -SIZE * 0.6);
   ctx.closePath();
-
-  // Nothing has appeared yet - the path is only a described outline.
-  // fill() is what actually paints it.
   ctx.fill();
 
-  // Undo the translate. Origin goes back to the top-left corner.
   ctx.restore();
 }
 
 
-// ---------------------------------------------------------------------
-// 4. Run it, now and on every resize
-// ---------------------------------------------------------------------
+// =====================================================================
+// 5. Start
+// =====================================================================
 
-// addEventListener says: when this thing happens, call this function.
-// 'resize' fires whenever the window changes size. Both steps are needed
-// each time - resizing wipes the canvas, so it has to be redrawn.
 window.addEventListener('resize', function () {
   fitToWindow();
   draw();
