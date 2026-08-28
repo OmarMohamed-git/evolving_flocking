@@ -45,13 +45,22 @@ const params = {
   // in this simulation.
   perceptionRadius: 60,
 
-  // How loudly each rule speaks when the forces are summed. Separation
-  // gets its own weight when it arrives.
+  // Personal space, in pixels. Always smaller than the perception radius:
+  // a boid is happy to travel alongside anything it can see, but pushes
+  // back against anything that gets inside this.
+  separationRadius: 25,
+
+  // How loudly each rule speaks when the forces are summed.
   //
   // These weights are the hand-tuned magic numbers the plan deletes in
   // stage 4, replacing them with values each boid inherits and mutates.
   alignmentWeight: 1.0,
-  cohesionWeight: 1.0,
+  cohesionWeight: 0.9,
+
+  // Separation is weighted highest of the three. It has to be: it only
+  // speaks when boids are already too close, so it needs to shout down
+  // two rules that are both pulling them together.
+  separationWeight: 1.6,
 };
 
 // How big a triangle is, in pixels. Used by the renderer to draw one, and

@@ -2,7 +2,7 @@
 // agent.js - what one boid is, how it decides, and how it moves
 // =====================================================================
 //
-// PROVIDES: makeBoid, align, cohere, flock, integrate, wrap
+// PROVIDES: makeBoid, align, cohere, separate, flock, integrate, wrap
 // NEEDS:    Vector2 (vector.js), params and SIZE (config.js),
 //           world (world.js) - for its width and height
 //
@@ -14,9 +14,9 @@
 // or later a spatial grid, exists. That keeps the rules testable on a
 // hand-written list of three boids, with no World anywhere in sight.
 //
-// Each neighbour arrives as { other, dx, dy }, where dx/dy is the offset
-// from this boid to that one, already corrected for the world wrapping.
-// The rules can therefore treat space as flat and infinite.
+// Each neighbour arrives as { other, dx, dy, distSq }, where dx/dy is the
+// offset from this boid to that one, already corrected for the world
+// wrapping. The rules can therefore treat space as flat and infinite.
 
 // Build one boid: somewhere random, moving flat out in a random direction.
 function makeBoid() {
@@ -122,6 +122,60 @@ function cohere(b, neighbours) {
             .limit(params.maxForce);
 }
 
+// SEPARATION: steer away from neighbours that are too close.
+//
+// The odd one out of the three. The other two look at every neighbour in
+// the perception radius; this one only reacts inside a much smaller
+// personal-space radius, and stays silent otherwise. Most of the time,
+// for most boids, it returns zero.
+//
+// THE 1/DISTANCE WEIGHTING IS THE WHOLE RULE.
+//
+// Without it, a boid pressed against another pushes exactly as hard as
+// one at the edge of its personal space, and the flock behaves like a gas -
+// evenly spread, no structure. Weighting each push by how close it is
+// means the rule is nearly silent at normal spacing and overwhelming on
+// contact, which is what produces a flock with a definite density rather
+// than one that either collapses or disperses.
+//
+// How the weighting happens without a square root:
+//
+//   (-dx, -dy)  points away from the neighbour, and is `dist` long
+//   .div(distSq)  makes it  dist / dist^2  =  1 / dist  long
+//
+// So the result is a unit vector away from that neighbour, scaled by
+// 1/distance. Twice as close, twice as hard a shove - and Math.sqrt is
+// never called.
+function separate(b, neighbours) {
+  const radiusSq = params.separationRadius * params.separationRadius;
+  const steer = new Vector2();
+  let count = 0;
+
+  for (const n of neighbours) {
+    // Only things inside personal space. Everything else is fine where it
+    // is - that is alignment and cohesion's business, not this rule's.
+    if (n.distSq > radiusSq) continue;
+
+    // Two boids at exactly the same point have no direction to separate
+    // along, and dividing by zero would produce NaN and lose the boid
+    // permanently. Rare, but it happens once cohesion has piled them up.
+    if (n.distSq === 0) continue;
+
+    steer.add(new Vector2(-n.dx, -n.dy).div(n.distSq));
+    count++;
+  }
+
+  // Nobody too close: no opinion at all. This is the normal case.
+  if (count === 0) return steer;
+
+  // Steps 2, 3 and 4 - identical to the other two rules. Note the sum is
+  // NOT divided by count: this is not an average. Being crowded by six
+  // boids should push harder than being crowded by one.
+  return steer.setMagnitude(params.maxSpeed)
+              .sub(b.velocity)
+              .limit(params.maxForce);
+}
+
 // Run every rule, weight the results, and accumulate them into this
 // frame's acceleration.
 //
@@ -129,18 +183,24 @@ function cohere(b, neighbours) {
 // votes with an arrow, and the sum is the compromise it actually follows.
 // The weights decide how loud each voice is.
 //
-// Two rules now, and they genuinely disagree: alignment wants to keep
-// pace with the group, cohesion wants to cut inwards toward it. The boid
-// follows neither - it follows the sum.
+// All three Reynolds rules, and they genuinely disagree: cohesion pulls
+// inwards, separation pushes outwards, alignment wants to keep pace with
+// the group. The boid follows none of them - it follows the sum.
+//
+// That standoff IS the flock. Cohesion alone collapses it to a point;
+// separation alone scatters it; the shape you see on screen is the
+// distance at which those two cancel, with alignment giving it a heading.
 //
 // .mult() modifies, but each force here is a fresh vector the rule just
 // returned, so there is nothing being damaged by weighting it in place.
 function flock(b, neighbours) {
   const alignment = align(b, neighbours);
   const cohesion = cohere(b, neighbours);
+  const separation = separate(b, neighbours);
 
   b.acceleration.add(alignment.mult(params.alignmentWeight));
   b.acceleration.add(cohesion.mult(params.cohesionWeight));
+  b.acceleration.add(separation.mult(params.separationWeight));
 }
 
 

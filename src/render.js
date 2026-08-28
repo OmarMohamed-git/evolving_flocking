@@ -3,7 +3,8 @@
 // =====================================================================
 //
 // PROVIDES: draw
-// NEEDS:    world, neighboursOf (world.js), align and cohere (agent.js),
+// NEEDS:    world, neighboursOf (world.js),
+//           align, cohere and separate (agent.js),
 //           params and SIZE (config.js)
 //
 // THE RULE FOR THIS FILE: it reads the world and never writes to it.
@@ -34,6 +35,8 @@ const LINK_COLOUR = 'rgba(255, 224, 102, 0.30)';
 const VELOCITY_COLOUR = '#c9d6e3';                 // where it is going now
 const ALIGNMENT_COLOUR = '#5cff9d';                // alignment's correction
 const COHESION_COLOUR = '#c98bff';                 // cohesion's correction
+const SEPARATION_COLOUR = '#ff7ab8';               // separation's correction
+const SEPARATION_RING_COLOUR = 'rgba(255, 122, 184, 0.45)';
 
 // Forces and velocities are in pixels per second (and per second squared).
 // Drawn at true length they would be far too long, so both are scaled down
@@ -121,6 +124,16 @@ function drawInspector(ctx, b) {
   ctx.beginPath();
   ctx.arc(p.x, p.y, params.perceptionRadius, 0, Math.PI * 2);
   ctx.stroke();
+
+  // --- personal space ---
+  // The inner circle separation reacts to. Anything between the two rings
+  // is a neighbour to align and cohere with; anything inside the small
+  // one is too close and gets shoved away.
+  ctx.strokeStyle = SEPARATION_RING_COLOUR;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, params.separationRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
   ctx.setLineDash([]);                  // setLineDash is sticky - reset it
 
   // --- who it can see ---
@@ -161,8 +174,8 @@ function drawInspector(ctx, b) {
   // top of this file. .mult() modifies, so this is applied to the fresh
   // vector each rule returned, not to anything the simulation owns.
   //
-  // Two arrows for two rules, and they will often point in different
-  // directions. Neither is what the boid does: it follows their sum,
+  // One arrow per rule, and they will often point in different
+  // directions. None of them is what the boid does: it follows their sum,
   // which is what makes the weights matter.
   const alignment = align(b, neighbours).mult(params.alignmentWeight);
   arrow(ctx, p.x, p.y, alignment.x, alignment.y,
@@ -171,6 +184,12 @@ function drawInspector(ctx, b) {
   const cohesion = cohere(b, neighbours).mult(params.cohesionWeight);
   arrow(ctx, p.x, p.y, cohesion.x, cohesion.y,
         COHESION_COLOUR, FORCE_ARROW_SCALE);
+
+  // Usually absent. Separation only speaks when something is inside the
+  // inner ring, so a pink arrow appearing is itself the information.
+  const separation = separate(b, neighbours).mult(params.separationWeight);
+  arrow(ctx, p.x, p.y, separation.x, separation.y,
+        SEPARATION_COLOUR, FORCE_ARROW_SCALE);
 
   // --- the boid itself, on top of everything ---
   ctx.fillStyle = SELECTED_COLOUR;

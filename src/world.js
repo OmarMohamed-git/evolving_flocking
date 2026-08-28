@@ -67,8 +67,9 @@ function wrappedDelta(from, to) {
 
 // Everything in `list` within the perception radius of b, excluding b.
 //
-// Each entry is { other, dx, dy } where dx/dy is the WRAPPED offset from
-// b to that neighbour - not the neighbour's absolute position.
+// Each entry is { other, dx, dy, distSq } where dx/dy is the WRAPPED
+// offset from b to that neighbour - not the neighbour's absolute position -
+// and distSq is how far away it is, SQUARED.
 //
 // Offsets rather than positions, for two reasons. The wrapped distance is
 // already computed here to do the radius check, so returning it costs
@@ -76,6 +77,11 @@ function wrappedDelta(from, to) {
 // means the rules in agent.js never have to know the world wraps: they
 // receive "that one is 12 left and 5 up from you" and can do their maths
 // without a special case at the screen edges.
+//
+// distSq is passed on un-square-rooted deliberately. Separation is the
+// only rule that cares how far away a neighbour is, it only cares about
+// the closest few, and it turns out to need the squared value anyway -
+// so the square root is never taken at all.
 //
 // THIS IS THE SLOW, HONEST VERSION: every boid checked against every
 // other. With 200 prey that is 40,000 distance checks per frame, which is
@@ -97,9 +103,10 @@ function neighboursOf(b, list) {
     // Compare SQUARED distances and skip the square root. If a^2 < b^2
     // then a < b, so the comparison is identical - and this runs tens of
     // thousands of times a frame, where a square root is not free.
-    if (dx * dx + dy * dy > radiusSq) continue;
+    const distSq = dx * dx + dy * dy;
+    if (distSq > radiusSq) continue;
 
-    found.push({ other, dx, dy });
+    found.push({ other, dx, dy, distSq });
   }
 
   return found;

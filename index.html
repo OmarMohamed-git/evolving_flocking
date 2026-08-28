@@ -109,6 +109,7 @@
   .dot.velocity { background: #c9d6e3; }
   .dot.alignment { background: #5cff9d; }
   .dot.cohesion { background: #c98bff; }
+  .dot.separation { background: #ff7ab8; }
   .dot.neighbour { background: #ffffff; }
 
   .legend {
@@ -134,7 +135,7 @@
 <!-- ===================== SIDEBAR ===================== -->
 <div id="sidebar">
   <h1>Evolving Flocking</h1>
-  <p class="subtitle">Stage 1 — alignment and cohesion.</p>
+  <p class="subtitle">Stage 1 — all three Reynolds rules.</p>
 
   <h2>Population</h2>
 
@@ -183,6 +184,14 @@
 
   <div class="control">
     <label>
+      <span>Separation radius</span>
+      <span class="value" id="separationRadius-value">25 px</span>
+    </label>
+    <input type="range" id="separationRadius" min="1" max="120" step="1" value="25">
+  </div>
+
+  <div class="control">
+    <label>
       <span><i class="dot alignment"></i>Alignment</span>
       <span class="value" id="alignmentWeight-value">1.00</span>
     </label>
@@ -192,9 +201,17 @@
   <div class="control">
     <label>
       <span><i class="dot cohesion"></i>Cohesion</span>
-      <span class="value" id="cohesionWeight-value">1.00</span>
+      <span class="value" id="cohesionWeight-value">0.90</span>
     </label>
-    <input type="range" id="cohesionWeight" min="0" max="3" step="0.05" value="1">
+    <input type="range" id="cohesionWeight" min="0" max="3" step="0.05" value="0.9">
+  </div>
+
+  <div class="control">
+    <label>
+      <span><i class="dot separation"></i>Separation</span>
+      <span class="value" id="separationWeight-value">1.60</span>
+    </label>
+    <input type="range" id="separationWeight" min="0" max="4" step="0.05" value="1.6">
   </div>
 
   <h2>Inspector</h2>
@@ -205,6 +222,7 @@
     <li><i class="dot velocity"></i>where it is going now</li>
     <li><i class="dot alignment"></i>alignment's correction to that</li>
     <li><i class="dot cohesion"></i>cohesion's correction to that</li>
+    <li><i class="dot separation"></i>separation's correction to that</li>
   </ul>
 
   <p class="note">
@@ -220,9 +238,15 @@
   </p>
 
   <p class="note">
-    Try Cohesion alone, with Alignment at 0 - the flock collapses into a
-    dense knot, because nothing keeps the boids apart. That is the problem
-    separation exists to solve.
+    The pink arrow is usually absent. Separation only speaks when
+    something is inside the inner ring, so seeing one appear is itself
+    the information.
+  </p>
+
+  <p class="note">
+    Drag Separation to 0 and the flock collapses to a point within
+    seconds. Drag Cohesion to 0 instead and it disperses. The flock you
+    see is the distance at which those two cancel out.
   </p>
 
   <p class="note">

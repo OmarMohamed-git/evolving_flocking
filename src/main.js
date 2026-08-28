@@ -183,10 +183,12 @@ bindSlider('preyCount', 'preyCount', v => String(v), n => syncPopulation(world.p
 bindSlider('predatorCount', 'predatorCount', v => String(v), n => syncPopulation(world.predators, n));
 bindSlider('maxSpeed', 'maxSpeed', v => v + ' px/s');
 bindSlider('perceptionRadius', 'perceptionRadius', v => v + ' px');
+bindSlider('separationRadius', 'separationRadius', v => v + ' px');
 
 // toFixed(2) keeps the readout a steady width as the value changes, so
 // the label does not jitter while being dragged.
 bindSlider('alignmentWeight', 'alignmentWeight', v => v.toFixed(2));
 bindSlider('cohesionWeight', 'cohesionWeight', v => v.toFixed(2));
+bindSlider('separationWeight', 'separationWeight', v => v.toFixed(2));
 
 requestAnimationFrame(frame);
