@@ -2,7 +2,8 @@
 // world.js - the populations, who can see whom, and one step of time
 // =====================================================================
 //
-// PROVIDES: world, syncPopulation, neighboursOf, update
+// PROVIDES: world, syncPopulation, wrappedDelta, neighboursOf,
+//           nearestBoid, update
 // NEEDS:    makeBoid, flock, integrate (agent.js), params (config.js)
 //
 // The world owns everything that exists, answers "who is near this boid",
@@ -92,6 +93,29 @@ function neighboursOf(b, list) {
   }
 
   return found;
+}
+
+
+// The boid closest to a point, used by the inspector overlay to decide
+// which one the cursor is pointing at.
+//
+// Squared distances again - the actual distance is never needed, only
+// which one is smallest.
+function nearestBoid(x, y, list) {
+  const point = { x, y };
+  let best = null;
+  let bestSq = Infinity;
+
+  for (const b of list) {
+    const { dx, dy } = wrappedDelta(point, b.position);
+    const dSq = dx * dx + dy * dy;
+    if (dSq < bestSq) {
+      bestSq = dSq;
+      best = b;
+    }
+  }
+
+  return best;
 }
 
 

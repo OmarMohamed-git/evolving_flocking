@@ -80,7 +80,56 @@ function bindSlider(id, key, format, onChange) {
 
 
 // ---------------------------------------------------------------------
-// 3. The frame loop
+// 3. The inspector - picking a boid to look at
+// ---------------------------------------------------------------------
+
+// Where the cursor is, in canvas coordinates, or null when it is off the
+// canvas entirely.
+let mouse = null;
+
+// When locked, the overlay stays on one boid instead of following the
+// cursor. Without this, inspecting anything means holding the mouse
+// perfectly still on a moving target.
+let lockedBoid = null;
+
+// The canvas does not start at the top-left of the window - the sidebar
+// is 260px wide. event.clientX is relative to the WINDOW, so the canvas's
+// own position has to be subtracted off, or every reading is 260px out.
+function canvasPoint(event) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+}
+
+canvas.addEventListener('mousemove', event => { mouse = canvasPoint(event); });
+canvas.addEventListener('mouseleave', () => { mouse = null; });
+
+// Click to lock onto the boid under the cursor; click again to release.
+canvas.addEventListener('click', event => {
+  if (lockedBoid) {
+    lockedBoid = null;
+    return;
+  }
+  const point = canvasPoint(event);
+  lockedBoid = nearestBoid(point.x, point.y, world.prey);
+});
+
+// Decide which boid the overlay should describe this frame.
+function selectedBoid() {
+  // A locked boid can be removed by the population slider being dragged
+  // down. Checking it is still in the list avoids inspecting a ghost that
+  // no longer moves or has neighbours.
+  if (lockedBoid) {
+    if (world.prey.includes(lockedBoid)) return lockedBoid;
+    lockedBoid = null;
+  }
+
+  if (!mouse) return null;
+  return nearestBoid(mouse.x, mouse.y, world.prey);
+}
+
+
+// ---------------------------------------------------------------------
+// 4. The frame loop
 // ---------------------------------------------------------------------
 
 // requestAnimationFrame(f) means "call f once, just before the next screen
@@ -101,15 +150,15 @@ function frame(now) {
   // pause instead of a jump.
   if (dt > 0.1) dt = 0.1;
 
-  update(dt);     // world.js - changes the numbers
-  draw(ctx);      // render.js - photographs them
+  update(dt);                  // world.js - changes the numbers
+  draw(ctx, selectedBoid());   // render.js - photographs them
 
   requestAnimationFrame(frame);   // book the next one
 }
 
 
 // ---------------------------------------------------------------------
-// 4. Start
+// 5. Start
 // ---------------------------------------------------------------------
 
 // Resizing wipes the canvas, but the loop repaints immediately anyway,
