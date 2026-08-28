@@ -54,10 +54,10 @@ function drawBoid(ctx, b) {
   // and never needs to know about angles.
   ctx.translate(b.position.x, b.position.y);
 
-  // heading() is atan2(y, x) - the direction vector turned back into an
+  // heading() is atan2(y, x) - the velocity vector turned back into an
   // angle. Wrapping it in a method means the argument order can only be
   // got wrong in one place, not at every call site.
-  ctx.rotate(b.direction.heading());
+  ctx.rotate(b.velocity.heading());
 
   ctx.beginPath();
   // Nose along +x, back corners behind it, so the triangle points RIGHT.

@@ -119,7 +119,7 @@
 <!-- ===================== SIDEBAR ===================== -->
 <div id="sidebar">
   <h1>Evolving Flocking</h1>
-  <p class="subtitle">Stage 1 — two populations, drifting.</p>
+  <p class="subtitle">Stage 1 — alignment.</p>
 
   <h2>Population</h2>
 
@@ -150,15 +150,33 @@
 
   <div class="control">
     <label>
-      <span>Speed</span>
-      <span class="value" id="speed-value">100 px/s</span>
+      <span>Max speed</span>
+      <span class="value" id="maxSpeed-value">100 px/s</span>
     </label>
-    <input type="range" id="speed" min="0" max="300" step="5" value="100">
+    <input type="range" id="maxSpeed" min="0" max="300" step="5" value="100">
+  </div>
+
+  <h2>Flocking</h2>
+
+  <div class="control">
+    <label>
+      <span>Perception radius</span>
+      <span class="value" id="perceptionRadius-value">60 px</span>
+    </label>
+    <input type="range" id="perceptionRadius" min="5" max="200" step="1" value="60">
+  </div>
+
+  <div class="control">
+    <label>
+      <span>Alignment</span>
+      <span class="value" id="alignmentWeight-value">1.00</span>
+    </label>
+    <input type="range" id="alignmentWeight" min="0" max="3" step="0.05" value="1">
   </div>
 
   <p class="note">
-    All three sliders are live. Predators behave exactly like prey for
-    now - the only difference is the colour.
+    Drag Alignment to 0 and back to see what the rule is doing. Predators
+    have no rules yet - they fly straight.
   </p>
 </div>
 

@@ -64,9 +64,9 @@ function bindSlider(id, key, format, onChange) {
     params[key] = value;
     output.textContent = format(value);
 
-    // Speed needs no follow-up work: moveAll reads params.speed every
-    // frame anyway. Population does, because a number changing is not
-    // the same as boids appearing.
+    // Most sliders need no follow-up work: the simulation reads params
+    // fresh every frame anyway. Population is the exception, because a
+    // number changing is not the same as boids appearing.
     if (onChange) onChange(value);
   }
 
@@ -132,6 +132,11 @@ fitToWindow();
 // wraps it in a small function that supplies the right one.
 bindSlider('preyCount', 'preyCount', v => String(v), n => syncPopulation(world.prey, n));
 bindSlider('predatorCount', 'predatorCount', v => String(v), n => syncPopulation(world.predators, n));
-bindSlider('speed', 'speed', v => v + ' px/s');
+bindSlider('maxSpeed', 'maxSpeed', v => v + ' px/s');
+bindSlider('perceptionRadius', 'perceptionRadius', v => v + ' px');
+
+// toFixed(2) keeps the readout a steady width as the value changes, so
+// the label does not jitter while being dragged.
+bindSlider('alignmentWeight', 'alignmentWeight', v => v.toFixed(2));
 
 requestAnimationFrame(frame);
