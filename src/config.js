@@ -45,12 +45,13 @@ const params = {
   // in this simulation.
   perceptionRadius: 60,
 
-  // How loudly the alignment rule speaks when the forces are summed.
-  // Separation and cohesion get their own weights when they arrive.
+  // How loudly each rule speaks when the forces are summed. Separation
+  // gets its own weight when it arrives.
   //
   // These weights are the hand-tuned magic numbers the plan deletes in
   // stage 4, replacing them with values each boid inherits and mutates.
   alignmentWeight: 1.0,
+  cohesionWeight: 1.0,
 };
 
 // How big a triangle is, in pixels. Used by the renderer to draw one, and

@@ -2,7 +2,7 @@
 // agent.js - what one boid is, how it decides, and how it moves
 // =====================================================================
 //
-// PROVIDES: makeBoid, align, flock, integrate, wrap
+// PROVIDES: makeBoid, align, cohere, flock, integrate, wrap
 // NEEDS:    Vector2 (vector.js), params and SIZE (config.js),
 //           world (world.js) - for its width and height
 //
@@ -13,6 +13,10 @@
 // and looking them up. A boid therefore never learns that a population,
 // or later a spatial grid, exists. That keeps the rules testable on a
 // hand-written list of three boids, with no World anywhere in sight.
+//
+// Each neighbour arrives as { other, dx, dy }, where dx/dy is the offset
+// from this boid to that one, already corrected for the world wrapping.
+// The rules can therefore treat space as flat and infinite.
 
 // Build one boid: somewhere random, moving flat out in a random direction.
 function makeBoid() {
@@ -66,7 +70,7 @@ function align(b, neighbours) {
 
   // Step 1: the average heading of everyone I can see.
   const sum = new Vector2();
-  for (const other of neighbours) sum.add(other.velocity);
+  for (const n of neighbours) sum.add(n.other.velocity);
   sum.div(neighbours.length);
 
   // Neighbours heading in exactly opposite directions can average to
@@ -81,6 +85,43 @@ function align(b, neighbours) {
             .limit(params.maxForce);
 }
 
+// COHESION: steer toward the average position of visible neighbours.
+//
+// Same four-step shape as align(). Only step 1 differs - it averages
+// WHERE the neighbours are instead of where they are going.
+//
+// The offsets are averaged rather than the positions. Averaging positions
+// would give the flock's centre as an absolute coordinate, which then has
+// to be subtracted from this boid's position to get a direction - and at
+// the screen seam that subtraction is wrong. A flock straddling the edge
+// would compute its centre in the middle of the canvas and the whole
+// flock would turn round and fly at it.
+//
+// Averaging the already-wrapped offsets skips the problem entirely: the
+// average of "12 left, 5 up" and "8 left, 1 down" IS the direction to the
+// local centre, with no absolute coordinate involved anywhere.
+//
+// This is the first rule where the torus actually bites. Alignment dodged
+// it because velocities do not care where you are.
+function cohere(b, neighbours) {
+  if (neighbours.length === 0) return new Vector2();
+
+  // Step 1: the average offset to everyone I can see - which points at
+  // the middle of them.
+  const sum = new Vector2();
+  for (const n of neighbours) sum.add(new Vector2(n.dx, n.dy));
+  sum.div(neighbours.length);
+
+  // A boid sitting exactly at the centre of its neighbours has nowhere to
+  // steer, and setMagnitude on a zero vector would be a divide by zero.
+  if (sum.magnitudeSq() === 0) return new Vector2();
+
+  // Steps 2, 3 and 4 - identical to alignment.
+  return sum.setMagnitude(params.maxSpeed)
+            .sub(b.velocity)
+            .limit(params.maxForce);
+}
+
 // Run every rule, weight the results, and accumulate them into this
 // frame's acceleration.
 //
@@ -88,12 +129,18 @@ function align(b, neighbours) {
 // votes with an arrow, and the sum is the compromise it actually follows.
 // The weights decide how loud each voice is.
 //
-// One rule so far, so there is nothing to compromise with yet. The shape
-// is here because separation and cohesion slot straight into it.
+// Two rules now, and they genuinely disagree: alignment wants to keep
+// pace with the group, cohesion wants to cut inwards toward it. The boid
+// follows neither - it follows the sum.
+//
+// .mult() modifies, but each force here is a fresh vector the rule just
+// returned, so there is nothing being damaged by weighting it in place.
 function flock(b, neighbours) {
   const alignment = align(b, neighbours);
+  const cohesion = cohere(b, neighbours);
 
   b.acceleration.add(alignment.mult(params.alignmentWeight));
+  b.acceleration.add(cohesion.mult(params.cohesionWeight));
 }
 
 

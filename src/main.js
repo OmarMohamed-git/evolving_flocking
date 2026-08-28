@@ -187,5 +187,6 @@ bindSlider('perceptionRadius', 'perceptionRadius', v => v + ' px');
 // toFixed(2) keeps the readout a steady width as the value changes, so
 // the label does not jitter while being dragged.
 bindSlider('alignmentWeight', 'alignmentWeight', v => v.toFixed(2));
+bindSlider('cohesionWeight', 'cohesionWeight', v => v.toFixed(2));
 
 requestAnimationFrame(frame);

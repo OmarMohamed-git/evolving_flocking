@@ -3,7 +3,7 @@
 // =====================================================================
 //
 // PROVIDES: draw
-// NEEDS:    world, neighboursOf (world.js), align (agent.js),
+// NEEDS:    world, neighboursOf (world.js), align and cohere (agent.js),
 //           params and SIZE (config.js)
 //
 // THE RULE FOR THIS FILE: it reads the world and never writes to it.
@@ -32,7 +32,8 @@ const NEIGHBOUR_COLOUR = '#ffffff';                // boids it can see
 const PERCEPTION_COLOUR = 'rgba(255, 224, 102, 0.55)';
 const LINK_COLOUR = 'rgba(255, 224, 102, 0.30)';
 const VELOCITY_COLOUR = '#c9d6e3';                 // where it is going now
-const ALIGNMENT_COLOUR = '#5cff9d';                // the steering correction
+const ALIGNMENT_COLOUR = '#5cff9d';                // alignment's correction
+const COHESION_COLOUR = '#c98bff';                 // cohesion's correction
 
 // Forces and velocities are in pixels per second (and per second squared).
 // Drawn at true length they would be far too long, so both are scaled down
@@ -126,24 +127,23 @@ function drawInspector(ctx, b) {
   // A line to each neighbour. These are exactly the boids whose velocities
   // get averaged, so the count of lines is the size of the average.
   //
-  // Drawn with the WRAPPED offset rather than the neighbour's raw
-  // position: a neighbour across the screen seam is genuinely close, and
-  // the line should be short and run off the edge, not stretch across the
-  // whole canvas.
+  // Drawn with the WRAPPED offset each neighbour arrives with, rather
+  // than its raw position: a neighbour across the screen seam is genuinely
+  // close, and the line should be short and run off the edge, not stretch
+  // across the whole canvas.
   ctx.strokeStyle = LINK_COLOUR;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  for (const other of neighbours) {
-    const { dx, dy } = wrappedDelta(p, other.position);
+  for (const n of neighbours) {
     ctx.moveTo(p.x, p.y);
-    ctx.lineTo(p.x + dx, p.y + dy);
+    ctx.lineTo(p.x + n.dx, p.y + n.dy);
   }
   ctx.stroke();
 
   // Mark the neighbours themselves, so they can be told apart from the
   // boids just outside the circle that are being ignored.
   ctx.fillStyle = NEIGHBOUR_COLOUR;
-  for (const other of neighbours) drawBoid(ctx, other);
+  for (const n of neighbours) drawBoid(ctx, n.other);
 
   // --- the two arrows ---
   //
@@ -159,10 +159,18 @@ function drawInspector(ctx, b) {
 
   // Recomputed here rather than read off the boid - see the note at the
   // top of this file. .mult() modifies, so this is applied to the fresh
-  // vector align() returned, not to anything the simulation owns.
+  // vector each rule returned, not to anything the simulation owns.
+  //
+  // Two arrows for two rules, and they will often point in different
+  // directions. Neither is what the boid does: it follows their sum,
+  // which is what makes the weights matter.
   const alignment = align(b, neighbours).mult(params.alignmentWeight);
   arrow(ctx, p.x, p.y, alignment.x, alignment.y,
         ALIGNMENT_COLOUR, FORCE_ARROW_SCALE);
+
+  const cohesion = cohere(b, neighbours).mult(params.cohesionWeight);
+  arrow(ctx, p.x, p.y, cohesion.x, cohesion.y,
+        COHESION_COLOUR, FORCE_ARROW_SCALE);
 
   // --- the boid itself, on top of everything ---
   ctx.fillStyle = SELECTED_COLOUR;

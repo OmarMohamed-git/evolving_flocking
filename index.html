@@ -108,6 +108,7 @@
   .dot.selected { background: #ffe066; }
   .dot.velocity { background: #c9d6e3; }
   .dot.alignment { background: #5cff9d; }
+  .dot.cohesion { background: #c98bff; }
   .dot.neighbour { background: #ffffff; }
 
   .legend {
@@ -133,7 +134,7 @@
 <!-- ===================== SIDEBAR ===================== -->
 <div id="sidebar">
   <h1>Evolving Flocking</h1>
-  <p class="subtitle">Stage 1 — alignment.</p>
+  <p class="subtitle">Stage 1 — alignment and cohesion.</p>
 
   <h2>Population</h2>
 
@@ -182,10 +183,18 @@
 
   <div class="control">
     <label>
-      <span>Alignment</span>
+      <span><i class="dot alignment"></i>Alignment</span>
       <span class="value" id="alignmentWeight-value">1.00</span>
     </label>
     <input type="range" id="alignmentWeight" min="0" max="3" step="0.05" value="1">
+  </div>
+
+  <div class="control">
+    <label>
+      <span><i class="dot cohesion"></i>Cohesion</span>
+      <span class="value" id="cohesionWeight-value">1.00</span>
+    </label>
+    <input type="range" id="cohesionWeight" min="0" max="3" step="0.05" value="1">
   </div>
 
   <h2>Inspector</h2>
@@ -195,6 +204,7 @@
     <li><i class="dot neighbour"></i>boids it can see</li>
     <li><i class="dot velocity"></i>where it is going now</li>
     <li><i class="dot alignment"></i>alignment's correction to that</li>
+    <li><i class="dot cohesion"></i>cohesion's correction to that</li>
   </ul>
 
   <p class="note">
@@ -203,10 +213,16 @@
   </p>
 
   <p class="note">
-    The green arrow is not a destination - it is the difference between
-    where the boid is going and where the rule wants it to go. It shrinks
-    to nothing once the flock settles, because there is nothing left to
-    correct. Drag Alignment to 0 and it disappears entirely.
+    The coloured arrows are not destinations - each is the difference
+    between where the boid is going and where that rule wants it to go.
+    They shrink to nothing once a flock settles, because there is nothing
+    left to correct. The boid follows neither arrow: it follows their sum.
+  </p>
+
+  <p class="note">
+    Try Cohesion alone, with Alignment at 0 - the flock collapses into a
+    dense knot, because nothing keeps the boids apart. That is the problem
+    separation exists to solve.
   </p>
 
   <p class="note">
