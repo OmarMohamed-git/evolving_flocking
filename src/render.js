@@ -25,7 +25,7 @@ function drawScene(ctx, selectedBoid) {
   drawPopulation(ctx, world.prey, COLOURS.prey);
   drawPopulation(ctx, world.predators, COLOURS.predator);
 
-  if (selectedBoid) drawInspector(ctx, selectedBoid);
+  if (selectedBoid && world.preyGrid) drawInspector(ctx, selectedBoid);
 }
 
 function clearCanvas(ctx) {
@@ -54,7 +54,7 @@ function drawBoid(ctx, boid) {
 }
 
 function drawInspector(ctx, boid) {
-  const neighbours = neighboursOf(boid, world.prey);
+  const neighbours = neighboursOf(boid, world.preyGrid);
 
   drawPerceptionRings(ctx, boid);
   drawNeighbourLinks(ctx, boid, neighbours);
