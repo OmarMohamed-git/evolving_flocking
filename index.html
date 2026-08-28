@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Boids — step 1: one triangle</title>
+<style>
+  /* margin: 0 removes the browser's default gap around the page.
+     overflow: hidden stops scrollbars appearing - a scrollbar would take
+     up ~15px of width, the canvas would no longer fit, and that alone can
+     make a second scrollbar appear on the other axis. */
+  html, body {
+    margin: 0;
+    overflow: hidden;
+    background: #0b0f14;
+  }
+
+  /* A <canvas> is inline by default, so the browser reserves a few pixels
+     under it for a text baseline. block removes that gap. */
+  canvas {
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<!-- No width/height attributes now. They get set from JavaScript instead,
+     because the window size is not known until the page runs. -->
+<canvas id="canvas"></canvas>
+
+<script>
+// ---------------------------------------------------------------------
+// 1. Find the canvas, and get something that can draw on it
+// ---------------------------------------------------------------------
+
+// `document` is the page. getElementById searches it for the tag whose
+// id attribute is "canvas" - the one written above - and returns it.
+const canvas = document.getElementById('canvas');
+
+// The tag itself has no drawing methods. Asking it for a "2d context"
+// returns a separate object that does: fillStyle, fillRect, beginPath,
+// moveTo, lineTo, fill, translate, rotate. `ctx` is the paintbrush.
+const ctx = canvas.getContext('2d');
+
+
+// ---------------------------------------------------------------------
+// 2. Match the canvas to the window
+// ---------------------------------------------------------------------
+
+// window.innerWidth / innerHeight are the size of the area the page can
+// actually use, in pixels - the window minus its toolbars and tabs.
+//
+// Assigning to canvas.width sets how many real pixels the canvas has to
+// draw on. It also WIPES the canvas completely - even setting it to the
+// value it already has. That is why all the drawing lives in a function
+// below and gets called again after every resize.
+function fitToWindow() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+
+// ---------------------------------------------------------------------
+// 3. Draw everything
+// ---------------------------------------------------------------------
+
+const SIZE = 20; // how big the triangle is, in pixels
+
+function draw() {
+  // --- the field ---
+
+  // fillStyle is a setting, not an argument. It stays set until changed,
+  // and everything filled after this line uses it.
+  ctx.fillStyle = '#0b0f14';
+
+  // Filled rectangle: x, y, width, height. Starting at (0,0) with the
+  // full canvas size covers the lot. Canvas coordinates start at the
+  // TOP-LEFT, and y increases DOWNWARDS.
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // --- the triangle ---
+
+  // save() snapshots the drawing state - where the origin is, rotation,
+  // colours. restore() puts it back. Everything between is temporary.
+  ctx.save();
+
+  // translate() moves the origin (0,0). After this line, drawing at (0,0)
+  // draws at the middle of the canvas - which is now the middle of the
+  // window, because the canvas fills it.
+  //
+  // This is why the triangle below is described around (0,0) rather than
+  // at real screen coordinates: the shape stays fixed and simple, and
+  // WHERE it appears is decided separately. Later, a rotate() added here
+  // will turn it to face its direction of travel, shape untouched.
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+
+  ctx.fillStyle = '#7fd4ff';
+
+  // beginPath() discards any previous path and starts fresh. Without it
+  // this triangle would be joined onto the rectangle above.
+  ctx.beginPath();
+
+  // moveTo lifts the pen and puts it down. lineTo draws from where the
+  // pen is to a new point.
+  //
+  // The nose is out along +x with the back corners behind it, so the
+  // triangle points RIGHT. Deliberate: an angle of 0 in canvas maths also
+  // points right, so later "rotate to my heading" will just work.
+  ctx.moveTo(SIZE, 0);                   // nose, out in front
+  ctx.lineTo(-SIZE * 0.6, SIZE * 0.6);   // back corner, below
+  ctx.lineTo(-SIZE * 0.6, -SIZE * 0.6);  // back corner, above
+
+  // closePath() draws the last edge, from the final corner back to the first.
+  ctx.closePath();
+
+  // Nothing has appeared yet - the path is only a described outline.
+  // fill() is what actually paints it.
+  ctx.fill();
+
+  // Undo the translate. Origin goes back to the top-left corner.
+  ctx.restore();
+}
+
+
+// ---------------------------------------------------------------------
+// 4. Run it, now and on every resize
+// ---------------------------------------------------------------------
+
+// addEventListener says: when this thing happens, call this function.
+// 'resize' fires whenever the window changes size. Both steps are needed
+// each time - resizing wipes the canvas, so it has to be redrawn.
+window.addEventListener('resize', function () {
+  fitToWindow();
+  draw();
+});
+
+fitToWindow();
+draw();
+</script>
+
+</body>
+</html>
