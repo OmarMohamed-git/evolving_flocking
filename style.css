@@ -1,0 +1,132 @@
+:root {
+  --background: #0b0f14;
+  --panel: #10161e;
+  --border: rgba(120, 160, 200, 0.18);
+  --text: #d7e3ef;
+  --muted: #8ba0b5;
+  --accent: #7fd4ff;
+
+  --prey: #7fd4ff;
+  --predator: #ff5c5c;
+  --selected: #ffe066;
+  --neighbour: #ffffff;
+  --velocity: #c9d6e3;
+  --alignment: #5cff9d;
+  --cohesion: #c98bff;
+  --separation: #ff7ab8;
+
+  --sidebar-width: 260px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  background: var(--background);
+  color: var(--text);
+  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  display: flex;
+}
+
+#sidebar {
+  flex: none;
+  width: var(--sidebar-width);
+  height: 100%;
+  padding: 18px 16px;
+  overflow-y: auto;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+}
+
+canvas {
+  flex: 1;
+  display: block;
+  cursor: crosshair;
+}
+
+h1 {
+  margin: 0 0 2px;
+  font-size: 14px;
+}
+
+h2 {
+  margin: 18px 0 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.subtitle {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.control {
+  margin-bottom: 14px;
+}
+
+.control label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.control .value {
+  color: var(--accent);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="range"] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.legend {
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 11px;
+  list-style: none;
+}
+
+.legend li {
+  margin-bottom: 5px;
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 2px;
+}
+
+.dot.prey { background: var(--prey); }
+.dot.predator { background: var(--predator); }
+.dot.selected { background: var(--selected); }
+.dot.neighbour { background: var(--neighbour); }
+.dot.velocity { background: var(--velocity); }
+.dot.alignment { background: var(--alignment); }
+.dot.cohesion { background: var(--cohesion); }
+.dot.separation { background: var(--separation); }
+
+.note {
+  margin: 14px 0 0;
+  color: #5f7285;
+  font-size: 11px;
+}

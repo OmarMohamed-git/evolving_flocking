@@ -1,283 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Evolving Flocking</title>
-<style>
-  /* --- page layout ---------------------------------------------------
-     The page is a horizontal flexbox: a fixed-width sidebar on the left,
-     and the canvas taking whatever is left over. 100vh means "100% of the
-     viewport height", so the whole thing is exactly one screen tall. */
-  html, body {
-    margin: 0;
-    height: 100vh;
-    overflow: hidden;
-    background: #0b0f14;
-    color: #d7e3ef;
-    font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  }
-
-  body {
-    display: flex;
-  }
-
-  /* flex: none stops the sidebar from being squashed or stretched -
-     it keeps its 260px whatever else happens. */
-  #sidebar {
-    flex: none;
-    width: 260px;
-    height: 100%;
-    padding: 18px 16px;
-    box-sizing: border-box;      /* padding counts inside the 260px */
-    overflow-y: auto;
-    background: #10161e;
-    border-right: 1px solid rgba(120, 160, 200, 0.18);
-  }
-
-  /* flex: 1 means "take all the remaining width". */
-  canvas {
-    flex: 1;
-    display: block;
-  }
-
-  /* --- sidebar text -------------------------------------------------- */
-  h1 {
-    margin: 0 0 2px;
-    font-size: 14px;
-  }
-
-  .subtitle {
-    margin: 0 0 18px;
-    font-size: 11px;
-    color: #8ba0b5;
-  }
-
-  h2 {
-    margin: 18px 0 10px;
-    padding-top: 14px;
-    border-top: 1px solid rgba(120, 160, 200, 0.18);
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #8ba0b5;
-  }
-
-  h2:first-of-type {
-    margin-top: 0;
-    padding-top: 0;
-    border-top: none;
-  }
-
-  /* --- one slider row ------------------------------------------------ */
-  .control {
-    margin-bottom: 14px;
-  }
-
-  /* The label is a flexbox too: name pushed left, number pushed right. */
-  .control label {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 4px;
-  }
-
-  .control .value {
-    color: #7fd4ff;
-    font-size: 11px;
-    /* tabular-nums stops the number jittering as digits change width */
-    font-variant-numeric: tabular-nums;
-  }
-
-  input[type="range"] {
-    width: 100%;
-    margin: 0;
-    accent-color: #7fd4ff;
-  }
-
-  /* Small colour square next to the prey / predator labels. */
-  .dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 2px;
-    margin-right: 6px;
-  }
-
-  .dot.prey { background: #7fd4ff; }
-  .dot.predator { background: #ff5c5c; }
-  .dot.selected { background: #ffe066; }
-  .dot.velocity { background: #c9d6e3; }
-  .dot.alignment { background: #5cff9d; }
-  .dot.cohesion { background: #c98bff; }
-  .dot.separation { background: #ff7ab8; }
-  .dot.neighbour { background: #ffffff; }
-
-  .legend {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    font-size: 11px;
-    color: #8ba0b5;
-  }
-
-  .legend li { margin-bottom: 5px; }
-
-  .note {
-    margin-top: 20px;
-    font-size: 11px;
-    color: #5f7285;
-    line-height: 1.5;
-  }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Evolving Flocking</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <aside id="sidebar">
+    <h1>Evolving Flocking</h1>
+    <p class="subtitle">Stage 1 — all three Reynolds rules.</p>
 
-<!-- ===================== SIDEBAR ===================== -->
-<div id="sidebar">
-  <h1>Evolving Flocking</h1>
-  <p class="subtitle">Stage 1 — all three Reynolds rules.</p>
+    <div id="controls"></div>
 
-  <h2>Population</h2>
+    <h2>Inspector</h2>
+    <ul class="legend">
+      <li><i class="dot selected"></i>the boid under the cursor</li>
+      <li><i class="dot neighbour"></i>boids it can see</li>
+      <li><i class="dot velocity"></i>where it is going now</li>
+      <li><i class="dot alignment"></i>alignment's correction to that</li>
+      <li><i class="dot cohesion"></i>cohesion's correction to that</li>
+      <li><i class="dot separation"></i>separation's correction to that</li>
+    </ul>
 
-  <!-- Each control is: a label holding a name and a live value readout,
-       then the slider itself.
+    <p class="note">
+      Hover the canvas to inspect a boid. Click to lock onto one, click again to release.
+    </p>
+    <p class="note">
+      Each arrow is a correction, not a destination. The boid follows their sum.
+    </p>
+    <p class="note">
+      Separation to 0 collapses the flock to a point. Cohesion to 0 disperses it.
+      What you see is where those two cancel.
+    </p>
+  </aside>
 
-       The id on the <input> is how JavaScript finds the slider.
-       The id on the <span> is how it finds the number to update.
-       min / max / step / value are plain HTML - no code needed for the
-       slider to work as a slider. -->
-  <div class="control">
-    <label>
-      <span><i class="dot prey"></i>Prey</span>
-      <span class="value" id="preyCount-value">200</span>
-    </label>
-    <input type="range" id="preyCount" min="0" max="1000" step="10" value="200">
-  </div>
+  <canvas id="canvas"></canvas>
 
-  <div class="control">
-    <label>
-      <span><i class="dot predator"></i>Predators</span>
-      <span class="value" id="predatorCount-value">3</span>
-    </label>
-    <input type="range" id="predatorCount" min="0" max="20" step="1" value="3">
-  </div>
-
-  <h2>Movement</h2>
-
-  <div class="control">
-    <label>
-      <span>Max speed</span>
-      <span class="value" id="maxSpeed-value">100 px/s</span>
-    </label>
-    <input type="range" id="maxSpeed" min="0" max="300" step="5" value="100">
-  </div>
-
-  <h2>Flocking</h2>
-
-  <div class="control">
-    <label>
-      <span>Perception radius</span>
-      <span class="value" id="perceptionRadius-value">60 px</span>
-    </label>
-    <input type="range" id="perceptionRadius" min="5" max="200" step="1" value="60">
-  </div>
-
-  <div class="control">
-    <label>
-      <span>Separation radius</span>
-      <span class="value" id="separationRadius-value">25 px</span>
-    </label>
-    <input type="range" id="separationRadius" min="1" max="120" step="1" value="25">
-  </div>
-
-  <div class="control">
-    <label>
-      <span><i class="dot alignment"></i>Alignment</span>
-      <span class="value" id="alignmentWeight-value">1.00</span>
-    </label>
-    <input type="range" id="alignmentWeight" min="0" max="3" step="0.05" value="1">
-  </div>
-
-  <div class="control">
-    <label>
-      <span><i class="dot cohesion"></i>Cohesion</span>
-      <span class="value" id="cohesionWeight-value">0.90</span>
-    </label>
-    <input type="range" id="cohesionWeight" min="0" max="3" step="0.05" value="0.9">
-  </div>
-
-  <div class="control">
-    <label>
-      <span><i class="dot separation"></i>Separation</span>
-      <span class="value" id="separationWeight-value">1.60</span>
-    </label>
-    <input type="range" id="separationWeight" min="0" max="4" step="0.05" value="1.6">
-  </div>
-
-  <h2>Inspector</h2>
-
-  <ul class="legend">
-    <li><i class="dot selected"></i>the boid under the cursor</li>
-    <li><i class="dot neighbour"></i>boids it can see</li>
-    <li><i class="dot velocity"></i>where it is going now</li>
-    <li><i class="dot alignment"></i>alignment's correction to that</li>
-    <li><i class="dot cohesion"></i>cohesion's correction to that</li>
-    <li><i class="dot separation"></i>separation's correction to that</li>
-  </ul>
-
-  <p class="note">
-    Hover the canvas to inspect a boid. Click to lock onto one, click
-    again to release.
-  </p>
-
-  <p class="note">
-    The coloured arrows are not destinations - each is the difference
-    between where the boid is going and where that rule wants it to go.
-    They shrink to nothing once a flock settles, because there is nothing
-    left to correct. The boid follows neither arrow: it follows their sum.
-  </p>
-
-  <p class="note">
-    The pink arrow is usually absent. Separation only speaks when
-    something is inside the inner ring, so seeing one appear is itself
-    the information.
-  </p>
-
-  <p class="note">
-    Drag Separation to 0 and the flock collapses to a point within
-    seconds. Drag Cohesion to 0 instead and it disperses. The flock you
-    see is the distance at which those two cancel out.
-  </p>
-
-  <p class="note">
-    Predators have no rules yet - they fly straight.
-  </p>
-</div>
-
-<!-- ===================== CANVAS ===================== -->
-<canvas id="canvas"></canvas>
-
-<!-- The whole simulation, split by what changes together rather than by
-     what things are. Load order IS the dependency graph with plain script
-     tags: each file may only use things defined in a file above it, and
-     getting it wrong gives a ReferenceError on load with no other hint.
-
-       vector.js  pure maths, depends on nothing
-       config.js  the tunable numbers
-       agent.js   one boid: what it is, how it moves      (needs Vector2)
-       world.js   the populations and one tick of time    (needs makeBoid)
-       render.js  drawing                                 (reads the world)
-       main.js    canvas, sliders, frame loop             (needs all of it)
-
-     Nothing points back up that list. render.js reads the world and never
-     writes to it, so the simulation runs identically with the drawing
-     removed - which is what stage 5's headless data runs need. -->
-<script src="src/vector.js"></script>
-<script src="src/config.js"></script>
-<script src="src/agent.js"></script>
-<script src="src/world.js"></script>
-<script src="src/render.js"></script>
-<script src="src/main.js"></script>
-
+  <script src="src/vector.js"></script>
+  <script src="src/config.js"></script>
+  <script src="src/agent.js"></script>
+  <script src="src/world.js"></script>
+  <script src="src/render.js"></script>
+  <script src="src/main.js"></script>
 </body>
 </html>

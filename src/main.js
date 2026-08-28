@@ -1,194 +1,131 @@
-// =====================================================================
-// main.js - the browser end: canvas, sliders, and the frame loop
-// =====================================================================
-//
-// PROVIDES: nothing - this is the file that starts everything
-// NEEDS:    everything else, which is why it is loaded last
-//
-// Everything the browser is responsible for lives here: finding the
-// canvas, reacting to the window changing size, reading the sliders, and
-// asking to be woken up once per screen repaint.
-//
-// The simulation files know none of this. They deal in numbers, and this
-// file is what connects those numbers to a screen and a mouse.
+'use strict';
 
-// ---------------------------------------------------------------------
-// 1. Canvas
-// ---------------------------------------------------------------------
+const MAX_FRAME_SECONDS = 0.1;
 
-// `document` is the page. getElementById finds the tag whose id attribute
-// is "canvas". The tag itself has no drawing methods - asking it for a
-// "2d context" returns a separate object that does.
+const CONTROL_SECTIONS = [
+  {
+    title: 'Population',
+    controls: [
+      { key: 'preyCount', label: 'Prey', swatch: 'prey', min: 0, max: 1000, step: 10,
+        onChange: value => resizePopulation(world.prey, value) },
+      { key: 'predatorCount', label: 'Predators', swatch: 'predator', min: 0, max: 20, step: 1,
+        onChange: value => resizePopulation(world.predators, value) },
+    ],
+  },
+  {
+    title: 'Movement',
+    controls: [
+      { key: 'maxSpeed', label: 'Max speed', min: 0, max: 300, step: 5, unit: 'px/s' },
+      { key: 'maxTurnForce', label: 'Turning force', min: 20, max: 800, step: 10, unit: 'px/s²' },
+    ],
+  },
+  {
+    title: 'Flocking',
+    controls: [
+      { key: 'perceptionRadius', label: 'Perception radius', min: 5, max: 200, step: 1, unit: 'px' },
+      { key: 'separationRadius', label: 'Separation radius', min: 1, max: 120, step: 1, unit: 'px' },
+      { key: 'alignmentWeight', label: 'Alignment', swatch: 'alignment', min: 0, max: 3, step: 0.05, decimals: 2 },
+      { key: 'cohesionWeight', label: 'Cohesion', swatch: 'cohesion', min: 0, max: 3, step: 0.05, decimals: 2 },
+      { key: 'separationWeight', label: 'Separation', swatch: 'separation', min: 0, max: 4, step: 0.05, decimals: 2 },
+    ],
+  },
+];
+
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
-// The canvas does not fill the window - the sidebar takes 260px of it.
-// clientWidth / clientHeight are the size the browser has actually laid
-// this element out at, after the CSS flexbox has done its work. That is
-// what to measure, not window.innerWidth.
-//
-// Assigning to canvas.width sets the real pixel grid AND wipes the canvas
-// blank, even when set to the value it already had. The loop repaints
-// immediately afterwards, so that does not matter here.
-//
-// The world is told its own size rather than reading the canvas itself.
-// That keeps the simulation independent of anything being drawn.
-function fitToWindow() {
+let pointerPosition = null;
+let lockedBoid = null;
+let lastFrameTime = performance.now();
+
+function formatValue(control, value) {
+  const number = value.toFixed(control.decimals ?? 0);
+  return control.unit ? `${number} ${control.unit}` : number;
+}
+
+function controlMarkup(control) {
+  const swatch = control.swatch ? `<i class="dot ${control.swatch}"></i>` : '';
+
+  return `
+    <div class="control">
+      <label for="${control.key}">
+        <span>${swatch}${control.label}</span>
+        <span class="value" id="${control.key}-value"></span>
+      </label>
+      <input type="range" id="${control.key}"
+             min="${control.min}" max="${control.max}" step="${control.step}"
+             value="${params[control.key]}">
+    </div>`;
+}
+
+function sectionMarkup(section) {
+  return `<h2>${section.title}</h2>${section.controls.map(controlMarkup).join('')}`;
+}
+
+function connectControl(control) {
+  const input = document.getElementById(control.key);
+  const readout = document.getElementById(`${control.key}-value`);
+
+  const apply = () => {
+    const value = Number(input.value);
+    params[control.key] = value;
+    readout.textContent = formatValue(control, value);
+    control.onChange?.(value);
+  };
+
+  input.addEventListener('input', apply);
+  apply();
+}
+
+function buildControls() {
+  const panel = document.getElementById('controls');
+  panel.innerHTML = CONTROL_SECTIONS.map(sectionMarkup).join('');
+  CONTROL_SECTIONS.flatMap(section => section.controls).forEach(connectControl);
+}
+
+function fitCanvasToWindow() {
   canvas.width = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
-
   world.width = canvas.width;
   world.height = canvas.height;
 }
 
-
-// ---------------------------------------------------------------------
-// 2. Sliders
-// ---------------------------------------------------------------------
-
-// One function handles every slider, so adding a fourth is one line
-// rather than another copy-pasted block.
-//
-//   id        - matches both the <input id="..."> and the <span id="...-value">
-//   key       - which field of params to write into
-//   format    - turns the number into the text shown beside the label
-//   onChange  - optional extra work to do after params is updated
-function bindSlider(id, key, format, onChange) {
-  const input = document.getElementById(id);
-  const output = document.getElementById(id + '-value');
-
-  function apply() {
-    // Slider values arrive as STRINGS - "200", not 200. Convert once,
-    // here at the edge, so nothing downstream has to think about it.
-    const value = Number(input.value);
-    params[key] = value;
-    output.textContent = format(value);
-
-    // Most sliders need no follow-up work: the simulation reads params
-    // fresh every frame anyway. Population is the exception, because a
-    // number changing is not the same as boids appearing.
-    if (onChange) onChange(value);
-  }
-
-  // 'input' fires continuously while dragging.
-  // ('change' would only fire once, on release - less responsive.)
-  input.addEventListener('input', apply);
-
-  // Run once at startup so params and the readout match the slider.
-  apply();
+function canvasPositionOf(event) {
+  const bounds = canvas.getBoundingClientRect();
+  return new Vector2(event.clientX - bounds.left, event.clientY - bounds.top);
 }
 
+function boidUnderInspection() {
+  if (lockedBoid && world.prey.includes(lockedBoid)) return lockedBoid;
 
-// ---------------------------------------------------------------------
-// 3. The inspector - picking a boid to look at
-// ---------------------------------------------------------------------
-
-// Where the cursor is, in canvas coordinates, or null when it is off the
-// canvas entirely.
-let mouse = null;
-
-// When locked, the overlay stays on one boid instead of following the
-// cursor. Without this, inspecting anything means holding the mouse
-// perfectly still on a moving target.
-let lockedBoid = null;
-
-// The canvas does not start at the top-left of the window - the sidebar
-// is 260px wide. event.clientX is relative to the WINDOW, so the canvas's
-// own position has to be subtracted off, or every reading is 260px out.
-function canvasPoint(event) {
-  const rect = canvas.getBoundingClientRect();
-  return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  lockedBoid = null;
+  return pointerPosition ? nearestBoid(pointerPosition, world.prey) : null;
 }
 
-canvas.addEventListener('mousemove', event => { mouse = canvasPoint(event); });
-canvas.addEventListener('mouseleave', () => { mouse = null; });
-
-// Click to lock onto the boid under the cursor; click again to release.
-canvas.addEventListener('click', event => {
-  if (lockedBoid) {
-    lockedBoid = null;
-    return;
-  }
-  const point = canvasPoint(event);
-  lockedBoid = nearestBoid(point.x, point.y, world.prey);
-});
-
-// Decide which boid the overlay should describe this frame.
-function selectedBoid() {
-  // A locked boid can be removed by the population slider being dragged
-  // down. Checking it is still in the list avoids inspecting a ghost that
-  // no longer moves or has neighbours.
-  if (lockedBoid) {
-    if (world.prey.includes(lockedBoid)) return lockedBoid;
-    lockedBoid = null;
-  }
-
-  if (!mouse) return null;
-  return nearestBoid(mouse.x, mouse.y, world.prey);
+function connectPointer() {
+  canvas.addEventListener('mousemove', event => { pointerPosition = canvasPositionOf(event); });
+  canvas.addEventListener('mouseleave', () => { pointerPosition = null; });
+  canvas.addEventListener('click', event => {
+    lockedBoid = lockedBoid ? null : nearestBoid(canvasPositionOf(event), world.prey);
+  });
 }
 
+function frame(timestamp) {
+  const elapsed = (timestamp - lastFrameTime) / 1000;
+  lastFrameTime = timestamp;
 
-// ---------------------------------------------------------------------
-// 4. The frame loop
-// ---------------------------------------------------------------------
+  update(Math.min(elapsed, MAX_FRAME_SECONDS));
+  drawScene(ctx, boidUnderInspection());
 
-// requestAnimationFrame(f) means "call f once, just before the next screen
-// repaint". It is not a loop on its own - f has to book the next frame at
-// the end of itself, which is what makes it run continuously.
-//
-// The browser passes f a timestamp in milliseconds. Subtracting the
-// previous one gives how long that frame actually took, which is dt.
-let lastTime = performance.now();
-
-function frame(now) {
-  let dt = (now - lastTime) / 1000;   // milliseconds -> seconds
-  lastTime = now;
-
-  // Switch to another tab and the browser stops calling this. Come back
-  // 30 seconds later and dt is 30 - one update step that teleports every
-  // boid across the screen. Capping it means a tab switch costs a small
-  // pause instead of a jump.
-  if (dt > 0.1) dt = 0.1;
-
-  update(dt);                  // world.js - changes the numbers
-  draw(ctx, selectedBoid());   // render.js - photographs them
-
-  requestAnimationFrame(frame);   // book the next one
+  requestAnimationFrame(frame);
 }
 
+function start() {
+  window.addEventListener('resize', fitCanvasToWindow);
+  fitCanvasToWindow();
+  connectPointer();
+  buildControls();
+  requestAnimationFrame(frame);
+}
 
-// ---------------------------------------------------------------------
-// 5. Start
-// ---------------------------------------------------------------------
-
-// Resizing wipes the canvas, but the loop repaints immediately anyway,
-// so there is no draw() call needed here.
-window.addEventListener('resize', fitToWindow);
-
-// ORDER MATTERS HERE.
-//
-// A <canvas> with no width/height attributes defaults to 300x150, and
-// world.width stays 0 until fitToWindow() has run. Anything that spawns
-// boids before that scatters them across a box in the top-left corner,
-// where they stay bunched.
-//
-// bindSlider() calls its handler once at startup to sync params with the
-// slider, and for the population sliders that handler builds the boids.
-// So the bindings have to happen AFTER the world has been given its size.
-fitToWindow();
-
-// syncPopulation needs to know WHICH list to resize, so each of these
-// wraps it in a small function that supplies the right one.
-bindSlider('preyCount', 'preyCount', v => String(v), n => syncPopulation(world.prey, n));
-bindSlider('predatorCount', 'predatorCount', v => String(v), n => syncPopulation(world.predators, n));
-bindSlider('maxSpeed', 'maxSpeed', v => v + ' px/s');
-bindSlider('perceptionRadius', 'perceptionRadius', v => v + ' px');
-bindSlider('separationRadius', 'separationRadius', v => v + ' px');
-
-// toFixed(2) keeps the readout a steady width as the value changes, so
-// the label does not jitter while being dragged.
-bindSlider('alignmentWeight', 'alignmentWeight', v => v.toFixed(2));
-bindSlider('cohesionWeight', 'cohesionWeight', v => v.toFixed(2));
-bindSlider('separationWeight', 'separationWeight', v => v.toFixed(2));
-
-requestAnimationFrame(frame);
+start();
